@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>El Tutor</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: sans-serif;
+  background: #111;
+  color: #eee;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Setup */
+#setup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  padding: 32px 24px;
+  gap: 12px;
+}
+#setup h1 { font-size: 1.8rem; color: #f0c040; }
+#setup p  { color: #aaa; font-size: 0.9rem; text-align: center; line-height: 1.6; max-width: 340px; }
+#setup a  { color: #f0c040; }
+#setup input {
+  width: 100%; max-width: 360px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid #333;
+  background: #1a1a1a;
+  color: #eee;
+  font-size: 1rem;
+  outline: none;
+}
+#setup input:focus { border-color: #f0c040; }
+#setup button {
+  width: 100%; max-width: 360px;
+  padding: 14px;
+  border-radius: 12px;
+  border: none;
+  background: #f0c040;
+  color: #111;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+}
+#setup-error { color: #e05; font-size: 0.85rem; min-height: 20px; }
+
+/* App */
+#app {
+  display: none;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}
+
+#toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid #222;
+  flex-shrink: 0;
+}
+#toolbar h1 { font-size: 1.1rem; color: #f0c040; }
+#key-btn {
+  background: none;
+  border: 1px solid #333;
+  color: #888;
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+#key-btn:hover { border-color: #f0c040; color: #f0c040; }
+
+#messages {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.msg {
+  max-width: 85%;
+  padding: 12px 14px;
+  border-radius: 16px;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  animation: pop 0.2s ease;
+}
+@keyframes pop { from { opacity:0; transform:scale(0.95); } to { opacity:1; transform:scale(1); } }
+
+.msg.ai   { background: #1e1e1e; border: 1px solid #2a2a2a; align-self: flex-start; border-bottom-left-radius: 4px; }
+.msg.user { background: #2a2000; border: 1px solid #3a3000; color: #f0c040; align-self: flex-end; border-bottom-right-radius: 4px; }
+
+.correction {
+  margin-top: 8px;
+  padding: 8px 10px;
+  background: #1a0808;
+  border-left: 3px solid #c04;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  color: #ccc;
+  line-height: 1.6;
+}
+.correction .fixed { color: #6d6; margin-top: 2px; }
+.correction .why   { color: #888; margin-top: 2px; font-style: italic; }
+
+/* Bottom */
+#bottom {
+  flex-shrink: 0;
+  border-top: 1px solid #222;
+  padding: 12px 16px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Live transcript */
+#live {
+  width: 100%;
+  min-height: 36px;
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 0.88rem;
+  color: #f0c040;
+  font-style: italic;
+  word-break: break-word;
+}
+#live.empty { color: #444; font-style: italic; }
+
+/* Status */
+#status {
+  font-size: 0.82rem;
+  color: #555;
+  min-height: 18px;
+}
+#status.listening { color: #f0c040; }
+#status.thinking  { color: #888; }
+#status.speaking  { color: #6ad; }
+
+/* Mic button */
+#mic {
+  width: 76px; height: 76px;
+  border-radius: 50%;
+  border: 2px solid #333;
+  background: #1a1a1a;
+  color: #888;
+  font-size: 1.9rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+#mic.listening {
+  background: #900;
+  border-color: #c00;
+  color: #fff;
+  animation: ring 1.5s infinite;
+}
+#mic.speaking {
+  background: #1a2a3a;
+  border-color: #36a;
+  color: #6ad;
+}
+#mic.thinking {
+  background: #1a1a1a;
+  border-color: #444;
+  color: #666;
+}
+@keyframes ring {
+  0%,100% { box-shadow: 0 0 0 0 rgba(200,0,0,0.5); }
+  50%      { box-shadow: 0 0 0 16px rgba(200,0,0,0); }
+}
+
+#hint { font-size: 0.72rem; color: #444; }
+</style>
+</head>
+<body>
+
+<!-- Setup screen -->
+<div id="setup">
+  <h1>El Tutor 🇪🇸</h1>
+  <p>A hands-free Spanish conversation partner. Get a free API key at <a href="https://console.groq.com" target="_blank">console.groq.com</a> — no credit card needed.</p>
+  <input type="password" id="key-input" placeholder="Paste your Groq key (gsk_...)" />
+  <button onclick="saveKey()">Start Speaking</button>
+  <div id="setup-error"></div>
+</div>
+
+<!-- Main app -->
+<div id="app">
+  <div id="toolbar">
+    <h1>El Tutor 🇪🇸</h1>
+    <button id="key-btn" onclick="showSetup()">Change key</button>
+  </div>
+
+  <div id="messages"></div>
+
+  <div id="bottom">
+    <div id="live" class="empty">Waiting to listen...</div>
+    <div id="status">Tap mic to begin</div>
+    <button id="mic" onclick="tapMic()">🎤</button>
+    <div id="hint">Tap once · pause 2 sec to send · hands-free after that</div>
+  </div>
+</div>
+
+<script>
+// ── State ─────────────────────────────────────────────────────────────────
+var groqKey      = localStorage.getItem("groq_key") || "";
+var convo        = [];
+var recog        = null;
+var listening    = false;
+var aiSpeaking   = false;
+var busy         = false;           // waiting for API response
+var handsFree    = false;           // becomes true after first tap
+
+// Transcript accumulation — key fix
+var finalText    = "";              // text confirmed across recognition restarts
+var interimText  = "";              // current unconfirmed interim
+
+var silTimer     = null;
+var SILENCE_MS   = 2000;
+
+// ── Setup ─────────────────────────────────────────────────────────────────
+function saveKey() {
+  var k = document.getElementById("key-input").value.trim();
+  if (k.length < 8) { document.getElementById("setup-error").textContent = "Key too short — check and try again."; return; }
+  groqKey = k;
+  localStorage.setItem("groq_key", k);
+  showApp();
+}
+document.getElementById("key-input").addEventListener("keydown", function(e) { if (e.key === "Enter") saveKey(); });
+function showSetup() {
+  document.getElementById("setup").style.display = "flex";
+  document.getElementById("app").style.display = "none";
+  document.getElementById("key-input").value = groqKey;
+  stopListening();
+  handsFree = false;
+}
+function showApp() {
+  document.getElementById("setup").style.display = "none";
+  document.getElementById("app").style.display = "flex";
+  if (convo.length === 0) greet();
+}
+
+// ── Greeting ──────────────────────────────────────────────────────────────
+function greet() {
+  var g = "Hola! Soy tu tutor de español. Como te llamas?";
+  addBubble("ai", g, null);
+  convo.push({ role: "assistant", content: g });
+  speakAI(g);
+}
+
+// ── Speech recognition ────────────────────────────────────────────────────
+function initSpeech() {
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    setStatus("Voice not supported — try Chrome or Safari", "");
+    document.getElementById("mic").style.opacity = "0.3";
+    document.getElementById("mic").style.pointerEvents = "none";
+    return;
+  }
+  recog = new SR();
+  recog.lang = "es-ES";
+  recog.continuous = false;      // we manually restart — gives us control
+  recog.interimResults = true;
+
+  recog.onresult = function(e) {
+    // Separate final and interim results
+    var sessionFinal   = "";
+    var sessionInterim = "";
+    for (var i = e.resultIndex; i < e.results.length; i++) {
+      var t = e.results[i][0].transcript;
+      if (e.results[i].isFinal) {
+        sessionFinal += t;
+      } else {
+        sessionInterim += t;
+      }
+    }
+
+    // Accumulate finals into our running total
+    if (sessionFinal) finalText += (finalText ? " " : "") + sessionFinal.trim();
+    interimText = sessionInterim;
+
+    var display = (finalText + (interimText ? " " + interimText : "")).trim();
+    showLive(display);
+
+    // Reset silence timer on any speech activity
+    clearTimeout(silTimer);
+    silTimer = setTimeout(function() {
+      if (listening && (finalText || interimText).trim()) {
+        doSend();
+      }
+    }, SILENCE_MS);
+  };
+
+  recog.onend = function() {
+    // If we're still supposed to be listening, restart immediately
+    // This handles the browser's ~10s cutoff
+    if (listening && !busy && !aiSpeaking) {
+      try { recog.start(); } catch(ex) {}
+    }
+  };
+
+  recog.onerror = function(e) {
+    if (e.error === "aborted") return;
+    if (e.error === "no-speech") {
+      // Keep waiting — restart silently
+      if (listening && !busy && !aiSpeaking) {
+        try { recog.start(); } catch(ex) {}
+      }
+      return;
+    }
+    setStatus("Mic error: " + e.error, "");
+    stopListening();
+  };
+}
+
+function startListening() {
+  if (busy || aiSpeaking) return;
+  finalText   = "";
+  interimText = "";
+  clearTimeout(silTimer);
+  listening = true;
+  showLive("", true);
+  setStatus("Listening...", "listening");
+  setMicState("listening");
+  try { recog.start(); } catch(ex) {}
+}
+
+function stopListening() {
+  clearTimeout(silTimer);
+  listening = false;
+  try { recog.stop(); } catch(ex) {}
+}
+
+function tapMic() {
+  if (aiSpeaking) {
+    // Tap during AI speech = interrupt and listen
+    window.speechSynthesis.cancel();
+    aiSpeaking = false;
+    handsFree = true;
+    startListening();
+    return;
+  }
+  if (busy) return;
+  if (listening) {
+    // Manual send
+    doSend();
+  } else {
+    handsFree = true;
+    startListening();
+  }
+}
+
+function doSend() {
+  // Grab everything we have
+  var text = (finalText + (interimText ? " " + interimText : "")).trim();
+  stopListening();
+  if (!text) {
+    setStatus("Didn't catch that — listening again", "listening");
+    setMicState("");
+    if (handsFree) setTimeout(startListening, 800);
+    return;
+  }
+  sendToAI(text);
+}
+
+// ── AI call ───────────────────────────────────────────────────────────────
+var SYSTEM = "You are a friendly Spanish conversation tutor named El Tutor. Rules:\n- Always reply in Spanish only. Never use English.\n- Keep replies short: 2-3 sentences max.\n- Always end with a question to keep conversation going.\n- Be warm and encouraging.\n\nAfter your Spanish reply, if the user made a grammar or vocabulary mistake, add a correction on a new line in exactly this format:\n[CORRECTION|original: <what they said wrong>|fixed: <correct version>|why: <brief reason in English>]\nOnly add this if there was a real mistake. Never add it otherwise.";
+
+function sendToAI(userText) {
+  busy = true;
+  addBubble("user", userText, null);
+  convo.push({ role: "user", content: userText });
+
+  var dot = addBubble("ai", "...", null);
+  dot.style.color = "#444";
+  setStatus("El Tutor is thinking...", "thinking");
+  setMicState("thinking");
+  showLive("", true);
+
+  var msgs = [{ role: "system", content: SYSTEM }].concat(convo);
+
+  fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer " + groqKey
+    },
+    body: JSON.stringify({
+      model: "llama-3.3-70b-versatile",
+      max_tokens: 300,
+      messages: msgs
+    })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    dot.remove();
+    busy = false;
+
+    if (data.error) {
+      addBubble("ai", "Error: " + data.error.message, null);
+      setStatus("Something went wrong", "");
+      setMicState("");
+      if (handsFree) setTimeout(startListening, 1000);
+      return;
+    }
+
+    var raw      = data.choices[0].message.content || "";
+    var corrData = null;
+    var corrMatch = raw.match(/\[CORRECTION\|original:\s*(.*?)\|fixed:\s*(.*?)\|why:\s*(.*?)\]/s);
+    var aiText   = raw.replace(/\[CORRECTION[^\]]*\]/s, "").trim();
+
+    if (corrMatch) {
+      corrData = {
+        original: corrMatch[1].trim(),
+        fixed:    corrMatch[2].trim(),
+        why:      corrMatch[3].trim()
+      };
+    }
+
+    convo.push({ role: "assistant", content: raw });
+    addBubble("ai", aiText, corrData);
+    speakAI(aiText);
+  })
+  .catch(function(err) {
+    dot.remove();
+    busy = false;
+    addBubble("ai", "Network error — check your connection.", null);
+    setStatus("Error", "");
+    setMicState("");
+    if (handsFree) setTimeout(startListening, 1000);
+  });
+}
+
+// ── TTS ───────────────────────────────────────────────────────────────────
+function speakAI(text) {
+  if (!window.speechSynthesis) {
+    // No TTS — go straight back to listening
+    afterSpeak();
+    return;
+  }
+  window.speechSynthesis.cancel();
+  aiSpeaking = true;
+  setStatus("El Tutor is speaking...", "speaking");
+  setMicState("speaking");
+
+  var u = new SpeechSynthesisUtterance(text);
+  u.lang = "es-ES";
+  u.rate = 0.88;
+  var voices = window.speechSynthesis.getVoices();
+  var esVoice = voices.find(function(v) { return v.lang.startsWith("es"); });
+  if (esVoice) u.voice = esVoice;
+
+  u.onend = function() {
+    aiSpeaking = false;
+    afterSpeak();
+  };
+  u.onerror = function() {
+    aiSpeaking = false;
+    afterSpeak();
+  };
+
+  window.speechSynthesis.speak(u);
+}
+
+function afterSpeak() {
+  if (handsFree) {
+    // Small pause then auto-listen
+    setTimeout(function() {
+      setStatus("Your turn — speak now", "listening");
+      startListening();
+    }, 600);
+  } else {
+    setStatus("Tap mic to respond", "");
+    setMicState("");
+  }
+}
+
+// ── UI helpers ─────────────────────────────────────────────────────────────
+function addBubble(role, text, corrData) {
+  var msgs = document.getElementById("messages");
+  var div  = document.createElement("div");
+  div.className = "msg " + role;
+  div.textContent = text;
+  if (corrData) {
+    var c = document.createElement("div");
+    c.className = "correction";
+    c.innerHTML = "You said: <em>" + esc(corrData.original) + "</em>"
+      + '<div class="fixed">Better: ' + esc(corrData.fixed) + '</div>'
+      + '<div class="why">' + esc(corrData.why) + '</div>';
+    div.appendChild(c);
+  }
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+  return div;
+}
+
+function showLive(text, empty) {
+  var el = document.getElementById("live");
+  if (empty || !text) {
+    el.textContent = listening ? "Speak now..." : "Waiting to listen...";
+    el.classList.add("empty");
+  } else {
+    el.textContent = text;
+    el.classList.remove("empty");
+  }
+}
+
+function setStatus(text, cls) {
+  var el = document.getElementById("status");
+  el.textContent = text;
+  el.className = cls || "";
+}
+
+function setMicState(state) {
+  var el = document.getElementById("mic");
+  el.className = state || "";
+}
+
+function esc(s) {
+  return ("" + s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+// ── Boot ──────────────────────────────────────────────────────────────────
+if (window.speechSynthesis) {
+  window.speechSynthesis.getVoices();
+  window.speechSynthesis.onvoiceschanged = function() { window.speechSynthesis.getVoices(); };
+}
+initSpeech();
+if (groqKey) showApp();
+</script>
+</body>
+</html>
